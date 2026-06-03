@@ -5,17 +5,18 @@ import { cn } from '@/lib/utils';
 interface PageHeaderProps {
   title: string;
   back?: boolean;
+  onBack?: () => void;
   action?: React.ReactNode;
   className?: string;
 }
 
-export function PageHeader({ title, back, action, className }: PageHeaderProps) {
+export function PageHeader({ title, back, onBack, action, className }: PageHeaderProps) {
   const navigate = useNavigate();
   return (
     <div className={cn('flex items-center gap-3 py-4 px-4 bg-white border-b border-surface-200 sticky top-0 z-10', className)}>
       {back && (
         <button
-          onClick={() => navigate(-1)}
+          onClick={onBack ?? (() => navigate(-1))}
           className="min-h-tap min-w-tap flex items-center justify-center rounded-xl hover:bg-surface-100 -ml-2"
           aria-label="Go back"
         >

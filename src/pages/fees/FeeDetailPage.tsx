@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Download, MessageCircle, Edit } from 'lucide-react';
+import { Download, MessageCircle, Edit, CheckCircle2 } from 'lucide-react';
 import { useFeeRecord, useUpdateFee } from '@/hooks/useFees';
 import { useGenerateReminder } from '@/hooks/useReminders';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -23,41 +23,58 @@ export function FeeDetailPage() {
   const generateReminder = useGenerateReminder();
 
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({
-    amount_paid: '',
-    discount: '',
-    payment_mode: 'CASH',
-    payment_date: '',
-    notes: '',
-  });
+  // "payingNow" = incremental amount being paid this time
+  const [payingNow, setPayingNow] = useState('');
+  const [editDiscount, setEditDiscount] = useState('');
+  const [editMode, setEditMode] = useState<'CASH' | 'UPI' | 'BANK_TRANSFER'>('CASH');
+  const [editDate, setEditDate] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editError, setEditError] = useState('');
   const [reminderLoading, setReminderLoading] = useState(false);
 
-  const handleEditOpen = () => {
+  const openEdit = (prefillFull = false) => {
     if (!fee) return;
-    setEditForm({
-      amount_paid: String(Number(fee.amount_paid)),
-      discount: String(Number(fee.discount)),
-      payment_mode: fee.payment_mode ?? 'CASH',
-      payment_date: fee.payment_date?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
-      notes: fee.notes ?? '',
-    });
+    const amountDue = Number(fee.amount_due);
+    const disc = Number(fee.discount);
+    const paid = Number(fee.amount_paid);
+    const bal = amountDue - disc - paid;
+    setPayingNow(prefillFull ? String(bal > 0 ? bal : 0) : '');
+    setEditDiscount(String(disc));
+    setEditMode((fee.payment_mode ?? 'CASH') as 'CASH' | 'UPI' | 'BANK_TRANSFER');
+    setEditDate(fee.payment_date?.slice(0, 10) ?? new Date().toISOString().slice(0, 10));
+    setEditNotes(fee.notes ?? '');
+    setEditError('');
     setEditing(true);
   };
 
-  const handleEditSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!fee) return;
+
+    const amountDue = Number(fee.amount_due);
+    const disc = parseFloat(editDiscount) || 0;
+    const existingPaid = Number(fee.amount_paid);
+    const addingNow = parseFloat(payingNow) || 0;
+    const newTotalPaid = existingPaid + addingNow;
+    const netDue = amountDue - disc;
+
+    if (addingNow < 0) { setEditError('Amount cannot be negative'); return; }
+    if (newTotalPaid > netDue) { setEditError(`Total paid cannot exceed payable amount (${formatMoney(netDue)})`); return; }
+    if (disc < 0 || disc > amountDue) { setEditError('Discount cannot exceed fee amount'); return; }
+
+    setEditError('');
     await updateFee.mutateAsync({
       id: fee.id,
       data: {
-        amount_paid: parseFloat(editForm.amount_paid) || 0,
-        discount: parseFloat(editForm.discount) || 0,
-        payment_mode: editForm.payment_mode as 'CASH' | 'UPI' | 'BANK_TRANSFER',
-        payment_date: editForm.payment_date || undefined,
-        notes: editForm.notes.trim() || undefined,
+        amount_paid: newTotalPaid,
+        discount: disc,
+        payment_mode: editMode,
+        payment_date: editDate || undefined,
+        notes: editNotes.trim() || undefined,
       },
     });
     setEditing(false);
+    setPayingNow('');
   };
 
   const handleReminder = async () => {
@@ -74,23 +91,8 @@ export function FeeDetailPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div>
-        <PageHeader title="Fee Details" back />
-        <div className="py-12"><Spinner /></div>
-      </div>
-    );
-  }
-
-  if (!fee) {
-    return (
-      <div>
-        <PageHeader title="Fee Details" back />
-        <div className="px-4 py-12 text-center text-surface-700">Record not found.</div>
-      </div>
-    );
-  }
+  if (isLoading) return <div><PageHeader title="Fee Details" back /><div className="py-12"><Spinner /></div></div>;
+  if (!fee) return <div><PageHeader title="Fee Details" back /><div className="px-4 py-12 text-center text-surface-700">Record not found.</div></div>;
 
   const amountDue = Number(fee.amount_due);
   const discount = Number(fee.discount);
@@ -98,19 +100,28 @@ export function FeeDetailPage() {
   const netDue = amountDue - discount;
   const balance = netDue - amountPaid;
 
+  // Live preview in edit sheet
+  const previewDiscount = parseFloat(editDiscount) || 0;
+  const previewNetDue = amountDue - previewDiscount;
+  const previewAdding = parseFloat(payingNow) || 0;
+  const previewNewTotal = amountPaid + previewAdding;
+  const previewBalance = previewNetDue - previewNewTotal;
+
   return (
     <div>
       <PageHeader
         title="Fee Details"
         back
         action={
-          <button
-            onClick={handleEditOpen}
-            className="min-h-tap min-w-tap flex items-center justify-center rounded-xl hover:bg-surface-100"
-            aria-label="Edit"
-          >
-            <Edit className="h-5 w-5 text-surface-700" />
-          </button>
+          fee.status !== 'PAID' ? (
+            <button
+              onClick={() => openEdit(false)}
+              className="min-h-tap min-w-tap flex items-center justify-center rounded-xl hover:bg-surface-100"
+              aria-label="Edit"
+            >
+              <Edit className="h-5 w-5 text-surface-700" />
+            </button>
+          ) : undefined
         }
       />
 
@@ -132,7 +143,7 @@ export function FeeDetailPage() {
           <FeeStatusBadge status={fee.status} />
         </div>
 
-        {/* Amount breakdown — receipt style */}
+        {/* Amount breakdown */}
         <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden">
           <div className="px-4 py-3 space-y-2.5 text-sm">
             <AmountRow label="Fee Charged" value={formatMoney(amountDue)} />
@@ -144,13 +155,11 @@ export function FeeDetailPage() {
             </div>
           </div>
 
-          {/* Paid strip */}
           <div className="border-t border-surface-100 px-4 py-3 flex items-center justify-between bg-paid-light">
             <span className="text-sm font-semibold text-paid-dark">Paid</span>
             <span className="text-base font-black text-paid">{formatMoney(amountPaid)}</span>
           </div>
 
-          {/* Balance strip — only if something is still owed */}
           {balance > 0 && (
             <div className="border-t border-surface-100 px-4 py-3 flex items-center justify-between bg-pending-light">
               <span className="text-sm font-semibold text-pending-dark">Balance Due</span>
@@ -159,7 +168,7 @@ export function FeeDetailPage() {
           )}
         </div>
 
-        {/* Payment info — only when something was paid */}
+        {/* Payment info */}
         {amountPaid > 0 && (
           <div className="bg-white rounded-2xl border border-surface-200 px-4 py-3 space-y-2 text-sm">
             {fee.payment_mode && (
@@ -194,6 +203,18 @@ export function FeeDetailPage() {
             </a>
           )}
 
+          {/* Mark as Paid — quick button for partial/pending */}
+          {fee.status !== 'PAID' && balance > 0 && (
+            <Button
+              variant="primary"
+              size="full"
+              onClick={() => openEdit(true)}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Mark as Paid ({formatMoney(balance)} remaining)
+            </Button>
+          )}
+
           {fee.status !== 'PAID' && (
             <Button
               variant="warning"
@@ -208,28 +229,70 @@ export function FeeDetailPage() {
         </div>
       </div>
 
-      {/* Edit bottom sheet */}
+      {/* Record payment bottom sheet */}
       {editing && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/40" onClick={() => setEditing(false)} />
           <form
-            onSubmit={handleEditSave}
-            className="relative bg-white rounded-t-3xl px-4 pt-5 pb-8 space-y-4"
+            onSubmit={handleSave}
+            className="relative bg-white rounded-t-3xl px-4 pt-5 pb-8 space-y-4 max-h-[90vh] overflow-y-auto"
           >
             <div className="w-10 h-1 bg-surface-300 rounded-full mx-auto mb-1" />
-            <h3 className="text-lg font-bold text-surface-900">Edit Record</h3>
+            <h3 className="text-lg font-bold text-surface-900">Record Payment</h3>
 
+            {/* Existing balance info */}
+            <div className="bg-surface-50 rounded-xl px-4 py-3 text-sm space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-surface-600">Fee Charged</span>
+                <span>{formatMoney(amountDue)}</span>
+              </div>
+              {previewDiscount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-surface-600">Discount</span>
+                  <span>− {formatMoney(previewDiscount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-surface-600">Already Paid</span>
+                <span className="text-paid font-semibold">{formatMoney(amountPaid)}</span>
+              </div>
+              <div className="flex justify-between border-t border-surface-200 pt-1.5">
+                <span className="font-semibold text-surface-900">Balance Due</span>
+                <span className="font-bold text-pending">{formatMoney(Math.max(0, previewNetDue - amountPaid))}</span>
+              </div>
+            </div>
+
+            {/* Paying now */}
             <Input
-              label="Total Paid So Far (₹)"
+              label="Paying Now (₹)"
               type="number"
               inputMode="numeric"
               prefix="₹"
-              value={editForm.amount_paid}
-              onChange={(e) => setEditForm((f) => ({ ...f, amount_paid: e.target.value }))}
+              placeholder={`Full balance: ${formatMoney(Math.max(0, previewNetDue - amountPaid))}`}
+              value={payingNow}
+              onChange={(e) => { setPayingNow(e.target.value); setEditError(''); }}
+              autoFocus
             />
-            <p className="text-xs text-surface-500 -mt-3">
-              Enter the correct running total, not just today's payment.
-            </p>
+
+            {/* Live preview after payment */}
+            {previewAdding > 0 && (
+              <div className="bg-surface-50 rounded-xl px-4 py-3 text-sm space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-surface-600">Paying Now</span>
+                  <span className="text-paid font-semibold">{formatMoney(previewAdding)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-surface-600">New Total Paid</span>
+                  <span className="font-semibold">{formatMoney(previewNewTotal)}</span>
+                </div>
+                <div className="flex justify-between border-t border-surface-200 pt-1.5">
+                  <span className="font-bold text-surface-900">Balance After</span>
+                  <span className={`font-black ${previewBalance <= 0 ? 'text-paid' : 'text-pending'}`}>
+                    {previewBalance <= 0 ? 'Fully Paid ✓' : formatMoney(previewBalance)}
+                  </span>
+                </div>
+              </div>
+            )}
 
             <Input
               label="Discount (₹)"
@@ -237,39 +300,48 @@ export function FeeDetailPage() {
               inputMode="numeric"
               prefix="₹"
               placeholder="0"
-              value={editForm.discount}
-              onChange={(e) => setEditForm((f) => ({ ...f, discount: e.target.value }))}
+              value={editDiscount}
+              onChange={(e) => { setEditDiscount(e.target.value); setEditError(''); }}
             />
 
             <div>
               <label className="block text-sm font-semibold text-surface-900 mb-2">Payment Mode</label>
-              <select
-                value={editForm.payment_mode}
-                onChange={(e) => setEditForm((f) => ({ ...f, payment_mode: e.target.value }))}
-                className="w-full min-h-tap rounded-xl border border-surface-200 bg-white px-4 text-base text-surface-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="CASH">Cash</option>
-                <option value="UPI">UPI</option>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-              </select>
+              <div className="grid grid-cols-3 gap-2">
+                {(['CASH', 'UPI', 'BANK_TRANSFER'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setEditMode(m)}
+                    className={`min-h-tap rounded-xl border text-sm font-semibold transition-colors ${
+                      editMode === m
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-surface-200 bg-white text-surface-700'
+                    }`}
+                  >
+                    {m === 'BANK_TRANSFER' ? 'Bank' : m.charAt(0) + m.slice(1).toLowerCase()}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <Input
               label="Payment Date"
               type="date"
-              value={editForm.payment_date}
-              onChange={(e) => setEditForm((f) => ({ ...f, payment_date: e.target.value }))}
+              value={editDate}
+              onChange={(e) => setEditDate(e.target.value)}
             />
 
             <Input
               label="Notes (optional)"
               placeholder="Any remarks..."
-              value={editForm.notes}
-              onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+              value={editNotes}
+              onChange={(e) => setEditNotes(e.target.value)}
             />
 
+            {editError && <p className="text-sm text-pending font-medium">{editError}</p>}
+
             <Button type="submit" size="full" loading={updateFee.isPending}>
-              Save Changes
+              Save Payment
             </Button>
           </form>
         </div>

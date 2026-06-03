@@ -21,6 +21,7 @@ import { StudentDetailPage } from '@/pages/students/StudentDetailPage';
 import { BatchesPage } from '@/pages/batches/BatchesPage';
 import { BatchFormPage } from '@/pages/batches/BatchFormPage';
 import { RecordFeePage } from '@/pages/fees/RecordFeePage';
+import { BulkRecordPage } from '@/pages/fees/BulkRecordPage';
 import { FeeDetailPage } from '@/pages/fees/FeeDetailPage';
 import { RemindersPage } from '@/pages/reminders/RemindersPage';
 import { BillingPage } from '@/pages/billing/BillingPage';
@@ -60,6 +61,7 @@ export default function App() {
 
                 {/* Fees */}
                 <Route path="/fees/new" element={<RecordFeePage />} />
+                <Route path="/fees/bulk" element={<BulkRecordPage />} />
                 <Route path="/fees/:id" element={<FeeDetailPage />} />
 
                 {/* Reminders */}

@@ -4,10 +4,11 @@ import type { InputHTMLAttributes } from 'react';
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  hint?: string;
   prefix?: string;
 }
 
-export function Input({ label, error, prefix, className, id, ...props }: InputProps) {
+export function Input({ label, error, hint, prefix, className, id, ...props }: InputProps) {
   const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
   return (
     <div className="flex flex-col gap-1.5">
@@ -35,6 +36,7 @@ export function Input({ label, error, prefix, className, id, ...props }: InputPr
           {...props}
         />
       </div>
+      {hint && !error && <p className="text-xs text-surface-500">{hint}</p>}
       {error && <p className="text-sm text-pending font-medium">{error}</p>}
     </div>
   );

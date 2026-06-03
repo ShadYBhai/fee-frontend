@@ -44,3 +44,21 @@ export interface UpdateFeeInput {
   payment_date?: string;
   notes?: string;
 }
+
+export interface BulkRecordFeeInput {
+  student_ids: string[];
+  month_from: number;
+  year_from: number;
+  month_to: number;
+  year_to: number;
+  discount?: number;
+  payment_mode?: PaymentMode;
+  payment_date?: string;
+  notes?: string;
+}
+
+export interface BulkRecordResult {
+  count: number;
+  records: Array<{ fee_id: string; student_id: string; student_name: string; status: FeeStatus }>;
+  skipped: Array<{ student_id: string; student_name: string; reason: string }>;
+}

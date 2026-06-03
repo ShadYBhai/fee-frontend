@@ -136,10 +136,11 @@ export function StudentFormPage() {
         </div>
 
         <Input
-          label="Monthly Fee (₹)"
+          label="Default Fee (₹)"
           type="number"
           placeholder="e.g. 1500"
           prefix="₹"
+          hint="Reference amount only. Change it when recording each payment."
           value={form.default_fee}
           onChange={(e) => setForm((f) => ({ ...f, default_fee: e.target.value }))}
           error={errors.default_fee}

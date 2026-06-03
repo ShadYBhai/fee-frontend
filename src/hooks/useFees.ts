@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import * as feesApi from '@/api/fees.api';
-import type { RecordFeeInput, UpdateFeeInput, FeeStatus } from '@/types/fee';
+import type { RecordFeeInput, UpdateFeeInput, BulkRecordFeeInput, FeeStatus } from '@/types/fee';
 
 export const FEES_KEY = ['fees'] as const;
 
@@ -32,6 +32,21 @@ export function useRecordFee() {
     },
     onError: (err: { displayMessage?: string }) =>
       toast.error(err.displayMessage ?? 'Could not record payment.'),
+  });
+}
+
+export function useRecordBulkFees() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: BulkRecordFeeInput) => feesApi.recordBulkFees(data),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: FEES_KEY });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ['students'] });
+      toast.success(`${result.count} payment(s) recorded.`);
+    },
+    onError: (err: { displayMessage?: string }) =>
+      toast.error(err.displayMessage ?? 'Could not record payments.'),
   });
 }
 

@@ -112,7 +112,7 @@ export function StudentDetailPage() {
             )}
             <div className="flex items-center gap-3 mt-1">
               <div>
-                <p className="text-xs text-surface-500">Monthly Fee</p>
+                <p className="text-xs text-surface-500">Default Fee</p>
                 <p className="text-base font-bold text-surface-900">{formatMoney(student.default_fee)}</p>
               </div>
               <div className="w-px h-8 bg-surface-200" />

@@ -40,21 +40,31 @@ export function DashboardPage() {
     else setMonth((m) => m + 1);
   };
 
-  const openQuickPay = (s: ThisMonthStudent, full = false) => {
+  const openQuickPay = (s: ThisMonthStudent) => {
+    // No fee record yet → go to RecordFeePage to create one
+    if (!s.fee_record_id) {
+      navigate(`/fees/new?student_id=${s.student_id}`);
+      return;
+    }
     const net = s.amount_due - s.discount;
     const remaining = net - s.amount_paid;
-    setPayForm({ amount_paid: full ? String(remaining) : '', payment_mode: 'CASH' });
+    setPayForm({ amount_paid: String(remaining > 0 ? remaining : 0), payment_mode: 'CASH' });
     setQuickPay(s);
   };
 
   const handleFullPay = async (s: ThisMonthStudent) => {
-    if (!s.fee_record_id) return;
+    // No fee record yet → go to RecordFeePage to create one
+    if (!s.fee_record_id) {
+      navigate(`/fees/new?student_id=${s.student_id}`);
+      return;
+    }
     const net = s.amount_due - s.discount;
     const remaining = net - s.amount_paid;
+    if (remaining <= 0) return;
     await updateFee.mutateAsync({
       id: s.fee_record_id,
       data: {
-        amount_paid: remaining + s.amount_paid,
+        amount_paid: s.amount_paid + remaining,
         payment_mode: 'CASH',
         payment_date: new Date().toISOString().slice(0, 10),
       },
@@ -226,9 +236,14 @@ export function DashboardPage() {
           </section>
         )}
 
-        <Button variant="primary" size="full" onClick={() => navigate('/fees/new')} className="mt-2">
-          + Record Payment
-        </Button>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <Button variant="primary" size="full" onClick={() => navigate('/fees/new')}>
+            + Record Payment
+          </Button>
+          <Button variant="secondary" size="full" onClick={() => navigate('/fees/bulk')}>
+            Bulk Payment
+          </Button>
+        </div>
       </div>
 
       {/* Quick Pay bottom sheet */}

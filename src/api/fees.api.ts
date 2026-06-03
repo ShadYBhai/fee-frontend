@@ -1,5 +1,5 @@
 import { api } from '@/lib/axios';
-import type { FeeRecord, RecordFeeInput, UpdateFeeInput } from '@/types/fee';
+import type { FeeRecord, RecordFeeInput, UpdateFeeInput, BulkRecordFeeInput, BulkRecordResult } from '@/types/fee';
 import type { FeeStatus } from '@/types/fee';
 
 interface ListFeesParams { student_id?: string; status?: FeeStatus; month?: number; year?: number; page?: number; limit?: number; }
@@ -15,6 +15,9 @@ export const recordFee = (data: RecordFeeInput) =>
 
 export const updateFeeRecord = (id: string, data: UpdateFeeInput) =>
   api.patch<{ data: FeeRecord }>(`/fees/${id}`, data).then((r) => r.data.data);
+
+export const recordBulkFees = (data: BulkRecordFeeInput) =>
+  api.post<{ data: BulkRecordResult }>('/fees/bulk', data).then((r) => r.data.data);
 
 export const getReceiptUrl = (id: string) =>
   `${api.defaults.baseURL}/fees/${id}/receipt`;

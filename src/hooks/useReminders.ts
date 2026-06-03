@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import * as remindersApi from '@/api/reminders.api';
+export { getExportCsvUrl } from '@/api/reminders.api';
 
 export const REMINDERS_KEY = ['reminders'] as const;
 
@@ -34,5 +35,14 @@ export function useGenerateBulkReminders() {
     },
     onError: (err: { displayMessage?: string }) =>
       toast.error(err.displayMessage ?? 'Could not generate bulk reminders.'),
+  });
+}
+
+export function useMonthlySummary(token: string | null) {
+  return useQuery({
+    queryKey: ['reminders', 'monthly-summary', token],
+    queryFn: () => remindersApi.getMonthlySummary(token!),
+    enabled: !!token,
+    retry: false,
   });
 }
